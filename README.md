@@ -58,19 +58,3 @@
 <p>
   Users should be aware of the "Acene Bias" currently present in the model weights. During the Phase III calibration, the model was heavily weighted toward acene-based aromatics (such as pentacene and anthracene) to force the regression into a conductive regime. As a result, the model may output highly similar bandgap values for structurally related acenes regardless of subtle topological variations. This bias is acknowledged as a constraint of the current training set, and the active fine-tuning module is provided to allow for the correction of these trends in future iterations.
 </p>
-
-<hr>
-
-<h2>Local Installation and Dependencies</h2>
-<p>To run this repository locally, ensure Python 3.10 is installed. Dependencies can be resolved via the provided configuration:</p>
-
-<pre><code>git clone https://github.com/ManroopXog/polymer-bandgap-predictor.git
-cd polymer-bandgap-predictor
-pip install -r requirements.txt
-streamlit run app.py</code></pre>
-
-<br>
-
-<p>
-  <b>Author:</b> Manroop Manota | B.Sc. Chemistry Honours, Swami Shraddhanand College, University of Delhi
-</p>
