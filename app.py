@@ -135,11 +135,18 @@ with tab1:
 # --- TAB 2: BATCH SCREENING ---
 with tab2:
     st.subheader("CSV Batch Screening")
+    st.markdown("Upload a CSV containing a list of candidate SMILES strings to evaluate them simultaneously.")
+    
+    # NEW: Explicit instructions for the CSV format
+    st.info("📝 **CSV Format Required:** Your file must be a `.csv` containing at least one column with valid **SMILES strings**. You can have other columns (like molecule names or IDs); the model will ignore them and only process the SMILES column you select below.")
+    
     uploaded_file = st.file_uploader("Upload your candidate CSV", type=["csv"], key="batch_uploader")
     
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         st.write("Preview of uploaded dataset:", df.head(3))
+        
+        # The app lets you dynamically select which column has the SMILES
         smiles_col = st.selectbox("Select the column containing SMILES:", df.columns, key="batch_smiles")
         
         if st.button("Run Batch Screening", key="batch_run"):
@@ -171,11 +178,18 @@ with tab2:
             
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Download Screening Results (CSV)", data=csv, file_name="teg_candidates_screened.csv", mime="text/csv")
-
+                     
+                    
 # --- TAB 3: ACTIVE FINE-TUNING ---
 with tab3:
     st.subheader("Retrain & Fine-Tune Model Weights")
     st.markdown("Upload a CSV containing ground-truth bandgap values to further adapt the Graph Attention Network to new polymers.")
+    
+    # NEW: Explicit instructions for the training CSV format
+    st.info("📝 **Training CSV Format Required:** Your file must contain at least two columns:\n"
+            "1. **SMILES:** The molecular structure string.\n"
+            "2. **Bandgap Target:** The known, true bandgap value in electron-volts (eV).\n"
+            "*(Make sure there are no blank/empty cells in these columns, or those rows will be skipped).*")
     
     train_file = st.file_uploader("Upload Training Dataset (CSV)", type=["csv"], key="train_uploader")
     
@@ -184,8 +198,9 @@ with tab3:
         st.write("Dataset Preview:", train_df.head(3))
         
         col1, col2 = st.columns(2)
-        train_smiles_col = col1.selectbox("SMILES Column:", train_df.columns, index=0)
-        train_target_col = col2.selectbox("Bandgap Target Column (eV):", train_df.columns, index=1 if len(train_df.columns)>1 else 0)
+        # The app lets you map the required data to whatever your column names actually are
+        train_smiles_col = col1.selectbox("Map your SMILES Column:", train_df.columns, index=0)
+        train_target_col = col2.selectbox("Map your Bandgap Target Column (eV):", train_df.columns, index=1 if len(train_df.columns)>1 else 0)
         
         col3, col4, col5 = st.columns(3)
         epochs = col3.number_input("Epochs", min_value=1, max_value=500, value=50, step=10)
@@ -193,11 +208,10 @@ with tab3:
         batch_size = col5.number_input("Batch Size", min_value=4, max_value=64, value=16, step=4)
         
         if st.button("Start Fine-Tuning", type="primary"):
-            # 1. Clean data and drop NaNs
+            # Clean data and drop NaNs
             train_df[train_target_col] = pd.to_numeric(train_df[train_target_col], errors='coerce')
             train_df = train_df.dropna(subset=[train_smiles_col, train_target_col])
             
-            # 2. Process Graphs
             with st.spinner("Converting SMILES to Graph representations..."):
                 train_graphs = []
                 raw_targets = []
@@ -209,7 +223,6 @@ with tab3:
                         train_graphs.append(graph)
                         raw_targets.append(target)
                 
-                # 3. Apply the existing scaler to the new targets
                 if train_graphs:
                     scaled_targets = scaler.transform(np.array(raw_targets).reshape(-1, 1))
                     for i, graph in enumerate(train_graphs):
@@ -218,7 +231,6 @@ with tab3:
             if len(train_graphs) == 0:
                 st.error("No valid molecules found to train on.")
             else:
-                # 4. Training Loop setup
                 loader = DataLoader(train_graphs, batch_size=batch_size, shuffle=True)
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
                 criterion = torch.nn.MSELoss()
@@ -227,7 +239,7 @@ with tab3:
                 progress_bar = st.progress(0, text="Starting training...")
                 loss_text = st.empty()
                 
-                model.train() # Set to training mode!
+                model.train()
                 
                 for epoch in range(1, epochs + 1):
                     total_loss = 0
@@ -236,7 +248,6 @@ with tab3:
                         out = model(data.x, data.edge_index, data.batch)
                         loss = criterion(out, data.y)
                         loss.backward()
-                        # Crucial: Gradient clipping prevents NaNs during live retraining
                         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                         optimizer.step()
                         total_loss += loss.item()
@@ -247,7 +258,6 @@ with tab3:
                 
                 st.success("Fine-tuning complete! The model weights have been updated in-memory.")
                 
-                # 5. Provide Download for the New Model
                 buffer = io.BytesIO()
                 torch.save(model.state_dict(), buffer)
                 buffer.seek(0)
@@ -259,3 +269,5 @@ with tab3:
                     mime="application/octet-stream",
                     help="Replace your old model_B_TEG.pth file with this one to keep these new improvements permanently."
                 )
+                
+        
