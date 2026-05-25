@@ -1,4 +1,4 @@
-<div align="center">
+<div>
   
 <h1>μ-TEG Polymer Bandgap Screener</h1>
 
