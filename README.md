@@ -8,14 +8,13 @@
   <img src="https://img.shields.io/badge/Streamlit-1.32.0-FF4B4B.svg?logo=streamlit&logoColor=white" alt="Streamlit">
 </p>
 
-<h3>High-Throughput Deep Learning Pipeline for Organic Thermoelectric Discovery</h3>
-
 <br>
 
+<h3>High-Throughput Deep Learning Pipeline for Organic Thermoelectric Discovery</h3>
+</div>
 <h2><a href="https://polymer-bandgap-predictor-zsea5kkwgk2eyiojqbzhrd.streamlit.app/">Click Here To Access The Live Application</a></h2>
 
 <br>
-</div>
 
 <hr>
 
