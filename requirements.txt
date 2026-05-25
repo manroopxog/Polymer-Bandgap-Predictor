@@ -1,0 +1,8 @@
+streamlit==1.32.0
+torch==2.1.0
+torch_geometric
+rdkit
+scikit-learn
+joblib
+numpy
+pandas
