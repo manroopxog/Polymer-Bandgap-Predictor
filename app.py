@@ -106,7 +106,7 @@ def load_model_and_scaler():
     model = BandgapPredictorGAT(num_node_features=11).to(device)
     
     model_path = 'gat_custom_finetuned (1).pth'
-    scaler_path = 'gat_harvard_scaler.pkl'
+    scaler_path = 'gat_harvard_scaler (1).pkl'
     
     if os.path.exists(model_path) and os.path.exists(scaler_path):
         model.load_state_dict(torch.load(model_path, map_location=device))
