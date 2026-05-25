@@ -83,7 +83,7 @@ st.set_page_config(page_title="μ-TEG Model B | Bandgap Screener", layout="wide"
 @st.cache_resource
 def load_assets():
     model = GATModel(num_node_features=10, hidden_channels=128)
-    model.load_state_dict(torch.load('model_B_TEG.pth', map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load('model_B_TEG_finetuned.pth', map_location=torch.device('cpu')))
     scaler = joblib.load('harvard_scaler.pkl')
     return model, scaler
 
