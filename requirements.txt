@@ -1,0 +1,7 @@
+streamlit
+pandas
+torch
+torch-geometric
+rdkit
+scikit-learn
+joblib
