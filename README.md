@@ -12,7 +12,7 @@
 
 <br>
 
-<h2><a href="INSERT_YOUR_STREAMLIT_LINK_HERE">Access Live Application</a></h2>
+<h2><a href="https://polymer-bandgap-predictor-zsea5kkwgk2eyiojqbzhrd.streamlit.app/">Click Here To Access The Live Application</a></h2>
 
 <br>
 </div>
