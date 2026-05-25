@@ -16,7 +16,3 @@ If you want to run this project on your own machine instead of the cloud:
 1. Clone this repository.
 2. Install the required dependencies: `pip install -r requirements.txt`
 3. Launch the app: `streamlit run app.py`
-
-## Author
-**Manroop Manota** Swami Shraddhanand College, University of Delhi  
-*(Developed for MEXT Research Proposal)*
