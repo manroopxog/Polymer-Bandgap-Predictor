@@ -105,7 +105,7 @@ def load_model_and_scaler():
     device = torch.device('cpu') 
     model = BandgapPredictorGAT(num_node_features=11).to(device)
     
-    model_path = 'gat_harvard_finetuned.pth'
+    model_path = 'gat_custom_finetuned (1).pth'
     scaler_path = 'gat_harvard_scaler.pkl'
     
     if os.path.exists(model_path) and os.path.exists(scaler_path):
@@ -119,7 +119,7 @@ def load_model_and_scaler():
 model, scaler, is_loaded = load_model_and_scaler()
 
 if not is_loaded:
-    st.warning("⚠️ Pre-trained weights not found! Please upload 'gat_harvard_finetuned.pth' and 'gat_harvard_scaler.pkl' to the repository. Predictions will be disabled until weights are loaded.")
+    st.warning("⚠️ Pre-trained weights not found! Please upload 'gat_harvard_finetuned (1).pth' and 'gat_harvard_scaler.pkl' to the repository. Predictions will be disabled until weights are loaded.")
 
 # ==========================================
 # 4. APP TABS
