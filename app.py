@@ -119,7 +119,7 @@ def load_model_and_scaler():
 model, scaler, is_loaded = load_model_and_scaler()
 
 if not is_loaded:
-    st.warning("⚠️ Pre-trained weights not found! Please upload 'gat_harvard_finetuned (1).pth' and 'gat_harvard_scaler.pkl' to the repository. Predictions will be disabled until weights are loaded.")
+    st.warning("⚠️ Pre-trained weights not found! Please upload 'gat_harvard_finetuned.pth' and 'gat_harvard_scaler.pkl' to the repository. Predictions will be disabled until weights are loaded.")
 
 # ==========================================
 # 4. APP TABS
