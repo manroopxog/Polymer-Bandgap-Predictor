@@ -9,6 +9,9 @@ import joblib
 import numpy as np
 import pandas as pd
 import io
+import py3Dmol
+from stmol import showmol
+
 
 # ==========================================
 # 1. DEFINE THE GAT MODEL ARCHITECTURE
@@ -106,6 +109,31 @@ tab1, tab2, tab3 = st.tabs(["Single Molecule", "Batch Screening", "Active Fine-T
 with tab1:
     st.subheader("Single Molecule Prediction")
     smiles_input = st.text_input("Enter SMILES string:", placeholder="e.g., c1cc(sc1)c2ccsc2")
+        if smiles_input:
+        mol = Chem.MolFromSmiles(user_smiles)
+        
+        if mol is not None:
+            st.subheader("Interactive 3D Geometry:")
+            
+            # Add Hydrogens and calculate 3D coordinates
+            mol = Chem.AddHs(mol)
+            AllChem.EmbedMolecule(mol, randomSeed=42)
+            AllChem.MMFFOptimizeMolecule(mol) # Optimizes the structure
+            
+            # Convert to a format the 3D viewer can read
+            mblock = Chem.MolToMolBlock(mol)
+            
+            # Set up the 3D viewer with the ball-and-stick look
+            viewer = py3Dmol.view(width=400, height=400)
+            viewer.addModel(mblock, "mol")
+            viewer.setStyle({'stick': {}, 'sphere': {'radius': 0.4}}) 
+            viewer.zoomTo()
+            
+            # Render it in Streamlit
+            showmol(viewer, height=400, width=400)
+        else:
+            st.error("Invalid SMILES string. Please check your input.")
+            
 
     if st.button("Predict Bandgap", key="single"):
         if not smiles_input:
