@@ -109,7 +109,7 @@ tab1, tab2, tab3 = st.tabs(["Single Molecule", "Batch Screening", "Active Fine-T
 with tab1:
     st.subheader("Single Molecule Prediction")
     smiles_input = st.text_input("Enter SMILES string:", placeholder="e.g., c1cc(sc1)c2ccsc2")
-        if smiles_input:
+    if smiles_input:
         mol = Chem.MolFromSmiles(user_smiles)
         
         if mol is not None:
