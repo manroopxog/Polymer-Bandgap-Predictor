@@ -165,78 +165,65 @@ with tab1:
         model.eval() 
         
         with st.spinner("Calculating quantum features & pinging global databases..."):
-            mol = Chem.MolFromSmiles(user_smiles)
-            if not mol:
-                st.error("Invalid SMILES string.")
-            elif scaler is None:
+            if scaler is None:
                 st.error("Scaler file not found. Please ensure your bandgap scaler is uploaded.")
             else:
-                mol = Chem.AddHs(mol)
-                AllChem.EmbedMolecule(mol, randomSeed=42, useRandomCoords=True)
-                AllChem.UFFOptimizeMolecule(mol, maxIters=1000)
-                    
-                x = torch.tensor([get_unified_features(a) for a in mol.GetAtoms()], dtype=torch.float).to(device)
-                edges, dists = [], []
-                conf = mol.GetConformer()
-                for bond in mol.GetBonds():
-                    i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-                    d = conf.GetAtomPosition(i).Distance(conf.GetAtomPosition(j))
-                    edges.extend([[i, j], [j, i]])
-                    dists.extend([d, d])
-                        
-                edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous().to(device)
-                edge_attr = torch.tensor(dists, dtype=torch.float).to(device)
-                batch = torch.zeros(mol.GetNumAtoms(), dtype=torch.long).to(device)
-
-                with torch.no_grad():
-                    scaled_pred = model(x, edge_index, edge_attr, batch).cpu().numpy()
-                    predicted_ev = scaler.inverse_transform(scaled_pred)[0][0]
+                # Use Model B's specific graph converter
+                graph = smiles_to_graph(user_smiles)
                 
-                st.subheader("🤖 AI Prediction Result")
-                st.metric(label="Predicted Bandgap", value=f"{predicted_ev:.3f} eV")
-                
-                if 1.0 <= predicted_ev <= 2.5:
-                    st.success("✅ IDEAL BANDGAP (Optimal Semiconductor).")
-                elif 0.5 <= predicted_ev < 1.0:
-                    st.warning("⚠️ NARROW BANDGAP (Approaching Metallic).")
-                elif 2.5 < predicted_ev <= 3.5:
-                    st.warning("⚠️ WIDE BANDGAP (Approaching Insulator).")
+                if graph is None:
+                    st.error("Invalid SMILES string.")
                 else:
-                    st.error("❌ INSULATOR / METALLIC (Outside viable semiconductor range).")
-
-                # 2. PubChem API Logic
-                st.subheader("🌐 PubChem Reality Check")
-                try:
-                    safe_smiles = urllib.parse.quote(user_smiles)
-                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{safe_smiles}/property/IUPACName,MolecularWeight,MolecularFormula,XLogP/JSON"
-                    response = requests.get(url)
+                    batch = torch.zeros(graph.x.shape[0], dtype=torch.long)
                     
-                    if response.status_code == 200:
-                        data = response.json()
-                        props = data['PropertyTable']['Properties'][0]
-                        
-                        cid = props.get('CID', 'Unknown')
-                        name = props.get('IUPACName', 'Complex Derivative (No standard name available)')
-                        weight = props.get('MolecularWeight', 'Unknown')
-                        formula = props.get('MolecularFormula', 'Unknown')
-                        xlogp = props.get('XLogP', 'Data not available')
-                        
-                        st.info(f"**✅ Molecule Recognized (PubChem CID: {cid})**\n\n"
-                                f"**Formula:** {formula}\n\n"
-                                f"**IUPAC Name:** {name}\n\n"
-                                f"**Mass:** {weight} g/mol\n\n"
-                                f"**XLogP (Toxicity/Bioaccumulation proxy):** {xlogp}")
-                        
-                    elif response.status_code == 404 or response.status_code == 400:
-                        st.success("🌟 **Novel Molecule!** No matches found in the PubChem database.")
+                    with torch.no_grad():
+                        # Model B only takes x, edge_index, and batch (no edge_attr)
+                        scaled_pred = model(graph.x, graph.edge_index, batch).numpy()
+                        predicted_ev = scaler.inverse_transform(scaled_pred)[0][0]
+                    
+                    st.subheader("🤖 AI Prediction Result")
+                    st.metric(label="Predicted Bandgap", value=f"{predicted_ev:.3f} eV")
+                    
+                    if 1.0 <= predicted_ev <= 2.5:
+                        st.success("✅ IDEAL BANDGAP (Optimal Semiconductor).")
+                    elif 0.5 <= predicted_ev < 1.0:
+                        st.warning("⚠️ NARROW BANDGAP (Approaching Metallic).")
+                    elif 2.5 < predicted_ev <= 3.5:
+                        st.warning("⚠️ WIDE BANDGAP (Approaching Insulator).")
                     else:
-                        st.warning("Could not connect to PubChem API.")
-                except Exception as e:
-                    st.warning(f"API Error: {e}")
-                    
-                    
-                               
+                        st.error("❌ INSULATOR / METALLIC (Outside viable semiconductor range).")
 
+                    # PubChem API Logic
+                    st.subheader("🌐 PubChem Reality Check")
+                    try:
+                        safe_smiles = urllib.parse.quote(user_smiles)
+                        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{safe_smiles}/property/IUPACName,MolecularWeight,MolecularFormula,XLogP/JSON"
+                        response = requests.get(url)
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            props = data['PropertyTable']['Properties'][0]
+                            
+                            cid = props.get('CID', 'Unknown')
+                            name = props.get('IUPACName', 'Complex Derivative (No standard name available)')
+                            weight = props.get('MolecularWeight', 'Unknown')
+                            formula = props.get('MolecularFormula', 'Unknown')
+                            xlogp = props.get('XLogP', 'Data not available')
+                            
+                            st.info(f"**✅ Molecule Recognized (PubChem CID: {cid})**\n\n"
+                                    f"**Formula:** {formula}\n\n"
+                                    f"**IUPAC Name:** {name}\n\n"
+                                    f"**Mass:** {weight} g/mol\n\n"
+                                    f"**XLogP (Toxicity/Bioaccumulation proxy):** {xlogp}")
+                            
+                        elif response.status_code == 404 or response.status_code == 400:
+                            st.success("🌟 **Novel Molecule!** No matches found in the PubChem database.")
+                        else:
+                            st.warning("Could not connect to PubChem API.")
+                    except Exception as e:
+                        st.warning(f"API Error: {e}")
+                    
+                    
 # --- TAB 2: BATCH SCREENING ---
 with tab2:
     st.subheader("CSV Batch Screening")
