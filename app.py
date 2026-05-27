@@ -5,6 +5,7 @@ from torch_geometric.nn import GATConv, global_mean_pool
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from rdkit import Chem
+from rdkit.chem important AllChem
 import joblib
 import numpy as np
 import pandas as pd
