@@ -106,60 +106,136 @@ st.markdown("Evaluate conductive organic polymers for micro-Thermoelectric Gener
 # Create navigation tabs
 tab1, tab2, tab3 = st.tabs(["Single Molecule", "Batch Screening", "Active Fine-Tuning"])
 
-# --- TAB 1: SINGLE MOLECULE ---
+# ==========================================
+# TAB 1: PREDICTION & DISCOVERY STUDIO
+# ==========================================
 with tab1:
-    st.subheader("Single Molecule Prediction")
-    smiles_input = st.text_input("Enter SMILES string:", placeholder="e.g., c1cc(sc1)c2ccsc2")
-    if smiles_input:
-        mol = Chem.MolFromSmiles(smiles_input)
-        
+    import urllib.parse
+    import requests
+    from rdkit.Chem import AllChem
+
+    st.markdown("Enter a SMILES string, or use the Mutator buttons to alter the chemistry.")
+    
+    if "bg_smiles_input" not in st.session_state:
+        st.session_state.bg_smiles_input = "N#CC(C#N)=C1C=CC(=C(C#N)C#N)C=C1"
+
+    def run_mutation(rxn_smarts):
+        try:
+            mol = Chem.MolFromSmiles(st.session_state.bg_smiles_input)
+            rxn = AllChem.ReactionFromSmarts(rxn_smarts)
+            products = rxn.RunReactants((mol,))
+            if products:
+                new_mol = products[0][0] 
+                Chem.SanitizeMol(new_mol)
+                st.session_state.bg_smiles_input = Chem.MolToSmiles(new_mol)
+        except:
+            pass 
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🧬 Mutate: Add Fluorine (-F)"):
+            run_mutation('[cH:1]>>[c:1](F)')
+    with col2:
+        if st.button("🧬 Mutate: Add Cyano (-C#N)"):
+            run_mutation('[cH:1]>>[c:1](C#N)')
+
+    user_smiles = st.text_input("Current Molecule SMILES:", st.session_state.bg_smiles_input)
+    
+    if user_smiles != st.session_state.bg_smiles_input:
+        st.session_state.bg_smiles_input = user_smiles
+
+    if user_smiles:
+        mol = Chem.MolFromSmiles(user_smiles)
         if mol is not None:
             st.subheader("Interactive 3D Geometry:")
-            
-            # Add Hydrogens and calculate 3D coordinates
             mol = Chem.AddHs(mol)
             AllChem.EmbedMolecule(mol, randomSeed=42)
-            AllChem.MMFFOptimizeMolecule(mol) # Optimizes the structure
-            
-            # Convert to a format the 3D viewer can read
+            AllChem.MMFFOptimizeMolecule(mol)
             mblock = Chem.MolToMolBlock(mol)
-            
-            # Set up the 3D viewer with the ball-and-stick look
             viewer = py3Dmol.view(width=400, height=400)
             viewer.addModel(mblock, "mol")
-            viewer.setStyle({'stick': {}, 'sphere': {'radius': 0.4}}) 
+            viewer.setStyle({'stick': {}, 'sphere': {'radius': 0.4}})
             viewer.zoomTo()
-            
-            # Render it in Streamlit
             showmol(viewer, height=400, width=400)
         else:
             st.error("Invalid SMILES string. Please check your input.")
-            
 
-    if st.button("Predict Bandgap", key="single"):
-        if not smiles_input:
-            st.warning("Please enter a SMILES string.")
-        else:
-            with st.spinner("Analyzing graph topology..."):
-                model.eval() # Ensure evaluation mode
-                graph = smiles_to_graph(smiles_input)
-                if graph is None:
-                    st.error("Invalid SMILES string.")
+    if st.button("Predict Bandgap & Search PubChem", type="primary"):
+        torch.manual_seed(42)
+        model.eval() 
+        
+        with st.spinner("Calculating quantum features & pinging global databases..."):
+            mol = Chem.MolFromSmiles(user_smiles)
+            if not mol:
+                st.error("Invalid SMILES string.")
+            elif scaler is None:
+                st.error("Scaler file not found. Please ensure your bandgap scaler is uploaded.")
+            else:
+                mol = Chem.AddHs(mol)
+                AllChem.EmbedMolecule(mol, randomSeed=42, useRandomCoords=True)
+                AllChem.UFFOptimizeMolecule(mol, maxIters=1000)
+                    
+                x = torch.tensor([get_unified_features(a) for a in mol.GetAtoms()], dtype=torch.float).to(device)
+                edges, dists = [], []
+                conf = mol.GetConformer()
+                for bond in mol.GetBonds():
+                    i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                    d = conf.GetAtomPosition(i).Distance(conf.GetAtomPosition(j))
+                    edges.extend([[i, j], [j, i]])
+                    dists.extend([d, d])
+                        
+                edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous().to(device)
+                edge_attr = torch.tensor(dists, dtype=torch.float).to(device)
+                batch = torch.zeros(mol.GetNumAtoms(), dtype=torch.long).to(device)
+
+                with torch.no_grad():
+                    scaled_pred = model(x, edge_index, edge_attr, batch).cpu().numpy()
+                    predicted_ev = scaler.inverse_transform(scaled_pred)[0][0]
+                
+                st.subheader("🤖 AI Prediction Result")
+                st.metric(label="Predicted Bandgap", value=f"{predicted_ev:.3f} eV")
+                
+                if 1.0 <= predicted_ev <= 2.5:
+                    st.success("✅ IDEAL BANDGAP (Optimal Semiconductor).")
+                elif 0.5 <= predicted_ev < 1.0:
+                    st.warning("⚠️ NARROW BANDGAP (Approaching Metallic).")
+                elif 2.5 < predicted_ev <= 3.5:
+                    st.warning("⚠️ WIDE BANDGAP (Approaching Insulator).")
                 else:
-                    batch = torch.zeros(graph.x.shape[0], dtype=torch.long)
-                    with torch.no_grad():
-                        scaled_prediction = model(graph.x, graph.edge_index, batch).numpy()
-                    real_bandgap = scaler.inverse_transform(scaled_prediction)[0][0]
+                    st.error("❌ INSULATOR / METALLIC (Outside viable semiconductor range).")
+
+                # 2. PubChem API Logic
+                st.subheader("🌐 PubChem Reality Check")
+                try:
+                    safe_smiles = urllib.parse.quote(user_smiles)
+                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{safe_smiles}/property/IUPACName,MolecularWeight,MolecularFormula,XLogP/JSON"
+                    response = requests.get(url)
                     
-                    st.success("Analysis Complete!")
-                    st.metric(label="Predicted Bandgap (E_g)", value=f"{real_bandgap:.4f} eV")
-                    
-                    if real_bandgap < 1.5:
-                        st.info("💡 **Excellent Candidate!** Narrow bandgap suggests high electrical conductivity.")
-                    elif real_bandgap < 3.0:
-                        st.warning("⚠️ **Moderate Bandgap.** May require heavy doping.")
+                    if response.status_code == 200:
+                        data = response.json()
+                        props = data['PropertyTable']['Properties'][0]
+                        
+                        cid = props.get('CID', 'Unknown')
+                        name = props.get('IUPACName', 'Complex Derivative (No standard name available)')
+                        weight = props.get('MolecularWeight', 'Unknown')
+                        formula = props.get('MolecularFormula', 'Unknown')
+                        xlogp = props.get('XLogP', 'Data not available')
+                        
+                        st.info(f"**✅ Molecule Recognized (PubChem CID: {cid})**\n\n"
+                                f"**Formula:** {formula}\n\n"
+                                f"**IUPAC Name:** {name}\n\n"
+                                f"**Mass:** {weight} g/mol\n\n"
+                                f"**XLogP (Toxicity/Bioaccumulation proxy):** {xlogp}")
+                        
+                    elif response.status_code == 404 or response.status_code == 400:
+                        st.success("🌟 **Novel Molecule!** No matches found in the PubChem database.")
                     else:
-                        st.error("🛑 **Wide Bandgap.** Likely an insulator.")
+                        st.warning("Could not connect to PubChem API.")
+                except Exception as e:
+                    st.warning(f"API Error: {e}")
+                    
+                    
+                               
 
 # --- TAB 2: BATCH SCREENING ---
 with tab2:
