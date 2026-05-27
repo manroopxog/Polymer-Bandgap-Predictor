@@ -110,7 +110,7 @@ with tab1:
     st.subheader("Single Molecule Prediction")
     smiles_input = st.text_input("Enter SMILES string:", placeholder="e.g., c1cc(sc1)c2ccsc2")
     if smiles_input:
-        mol = Chem.MolFromSmiles(user_smiles)
+        mol = Chem.MolFromSmiles(smiles_input)
         
         if mol is not None:
             st.subheader("Interactive 3D Geometry:")
