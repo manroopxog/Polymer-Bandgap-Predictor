@@ -106,7 +106,7 @@ st.markdown("Evaluate conductive organic polymers for micro-Thermoelectric Gener
 # Create navigation tabs
 tab1, tab2, tab3 = st.tabs(["Single Molecule", "Batch Screening", "Active Fine-Tuning"])
 
-# ==========================================
+ # ==========================================
 # TAB 1: PREDICTION & DISCOVERY STUDIO
 # ==========================================
 with tab1:
@@ -121,7 +121,8 @@ with tab1:
 
     def run_mutation(rxn_smarts):
         try:
-            mol = Chem.MolFromSmiles(st.session_state.bg_smiles_input)
+            clean_for_mut = st.session_state.bg_smiles_input.strip()
+            mol = Chem.MolFromSmiles(clean_for_mut)
             rxn = AllChem.ReactionFromSmarts(rxn_smarts)
             products = rxn.RunReactants((mol,))
             if products:
@@ -139,13 +140,14 @@ with tab1:
         if st.button("🧬 Mutate: Add Cyano (-C#N)"):
             run_mutation('[cH:1]>>[c:1](C#N)')
 
-    user_smiles = st.text_input("Current Molecule SMILES:", st.session_state.bg_smiles_input)
+    # FIX 1: Tie the widget directly to session state using 'key'
+    user_smiles = st.text_input("Current Molecule SMILES:", key="bg_smiles_input")
     
-    if user_smiles != st.session_state.bg_smiles_input:
-        st.session_state.bg_smiles_input = user_smiles
+    # FIX 2: Strip hidden mobile keyboard spaces
+    clean_smiles = user_smiles.strip() if user_smiles else ""
 
-    if user_smiles:
-        mol = Chem.MolFromSmiles(user_smiles)
+    if clean_smiles:
+        mol = Chem.MolFromSmiles(clean_smiles)
         if mol is not None:
             st.subheader("Interactive 3D Geometry:")
             mol = Chem.AddHs(mol)
@@ -168,8 +170,8 @@ with tab1:
             if scaler is None:
                 st.error("Scaler file not found. Please ensure your bandgap scaler is uploaded.")
             else:
-                # Use Model B's specific graph converter
-                graph = smiles_to_graph(user_smiles)
+                # Using the clean string to prevent mobile crashes
+                graph = smiles_to_graph(clean_smiles)
                 
                 if graph is None:
                     st.error("Invalid SMILES string.")
@@ -177,7 +179,6 @@ with tab1:
                     batch = torch.zeros(graph.x.shape[0], dtype=torch.long)
                     
                     with torch.no_grad():
-                        # Model B only takes x, edge_index, and batch (no edge_attr)
                         scaled_pred = model(graph.x, graph.edge_index, batch).numpy()
                         predicted_ev = scaler.inverse_transform(scaled_pred)[0][0]
                     
@@ -196,7 +197,7 @@ with tab1:
                     # PubChem API Logic
                     st.subheader("🌐 PubChem Reality Check")
                     try:
-                        safe_smiles = urllib.parse.quote(user_smiles)
+                        safe_smiles = urllib.parse.quote(clean_smiles)
                         url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{safe_smiles}/property/IUPACName,MolecularWeight,MolecularFormula,XLogP/JSON"
                         response = requests.get(url)
                         
@@ -222,6 +223,8 @@ with tab1:
                             st.warning("Could not connect to PubChem API.")
                     except Exception as e:
                         st.warning(f"API Error: {e}")
+                        
+                    
                     
                     
 # --- TAB 2: BATCH SCREENING ---
